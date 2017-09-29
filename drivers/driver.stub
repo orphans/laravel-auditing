@@ -27,7 +27,7 @@ class DummyClass implements AuditDriver
      *
      * @return \OwenIt\Auditing\Models\Audit
      */
-    public function audit(Auditable $model)
+    public function audit(Auditable $model, $table_name, $pivot_data = null)
     {
         // TODO: Change the auto-generated stub
     }

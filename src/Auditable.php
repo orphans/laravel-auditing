@@ -19,6 +19,7 @@ use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Request;
 use Illuminate\Support\Str;
 use OwenIt\Auditing\Contracts\UserResolver;
+use OwenIt\Auditing\Relations\AuditableBelongsToMany;
 use RuntimeException;
 use UnexpectedValueException;
 
@@ -37,6 +38,19 @@ trait Auditable
      * @var string
      */
     protected $auditEvent;
+
+    public function __construct()
+    {
+        if(!isset($this->observables)) {
+            $this->observables = [];
+        }
+
+        $this->observables = array_merge($this->observables, [
+                'pivot_attached',
+                'pivot_updated',
+                'pivot_detached'
+            ]);
+    }
 
     /**
      * Auditable boot logic.
@@ -171,6 +185,72 @@ trait Auditable
     }
 
     /**
+     * Set the old/new attributes corresponding to a pivot attached event.
+     *
+     * @param array $old
+     * @param array $new
+     *
+     * @return void
+     */
+    protected function auditPivotAttachedAttributes(array &$old, array &$new, $table_name, $old_pivot_data, $new_pivot_data)
+    {
+        foreach ($new_pivot_data as $attribute => $value) {
+            if ($this->isAttributeAuditable($table_name . '.' .$attribute)) {
+                $new[$attribute] = $value;
+            }
+        }
+    }
+
+    /**
+     * Set the old/new attributes corresponding to a pivot attached event.
+     *
+     * @param array $old
+     * @param array $new
+     *
+     * @return void
+     */
+    protected function auditPivotUpdatedAttributes(array &$old, array &$new, $table_name, $old_pivot_data, $new_pivot_data)
+    {
+        $old = $old_pivot_data;
+        $new = $new_pivot_data;
+
+        $dirty_keys = array_merge(array_keys($old_pivot_data), array_keys($new_pivot_data));
+
+        $dirty_keys = array_filter($dirty_keys, function($dirty_key) use ($old_pivot_data, $new_pivot_data) {
+            if(isset($old_pivot_data[$dirty_key]) && isset($new_pivot_data[$dirty_key])) {
+                if($old_pivot_data[$dirty_key] === $new_pivot_data[$dirty_key]) {
+                    return false;
+                }
+            }
+            return true;
+        });
+
+        foreach($dirty_keys as $attribute) {
+            if($this->isAuditingAuditable($table_name . '.' . $attribute)) {
+                $old[$attribute] = array_get($old_pivot_data, $attribute);
+                $new[$attribute] = array_get($new_pivot_data, $attribute);
+            }
+        } 
+    }
+
+    /**
+     * Set the old/new attributes corresponding to a pivot attached event.
+     *
+     * @param array $old
+     * @param array $new
+     *
+     * @return void
+     */
+    protected function auditPivotDetachedAttributes(array &$old, array &$new, $table_name, $old_pivot_data, $new_pivot_data)
+    {
+        foreach ($old_pivot_data as $attribute => $value) {
+            if ($this->isAttributeAuditable($table_name . '.' . $attribute)) {
+                $old[$attribute] = $value;
+            }
+        }
+    }
+
+    /**
      * {@inheritdoc}
      */
     public function readyForAuditing()
@@ -181,8 +261,12 @@ trait Auditable
     /**
      * {@inheritdoc}
      */
-    public function toAudit()
+    public function toAudit($table_name = null)
     {
+        if(is_null($table_name)) {
+            $table_name = $this->getTable();
+        }
+
         if (!$this->readyForAuditing()) {
             throw new RuntimeException('A valid audit event has not been set');
         }
@@ -212,6 +296,53 @@ trait Auditable
             'event'          => $this->auditEvent,
             'auditable_id'   => $this->getKey(),
             'auditable_type' => $this->getMorphClass(),
+            'table'          => $table_name,
+            $foreignKey      => $this->resolveUserId(),
+            'url'            => $this->resolveUrl(),
+            'ip_address'     => $this->resolveIpAddress(),
+            'user_agent'     => $this->resolveUserAgent(),
+        ]);
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function toAuditPivot($table_name = null, $old_pivot_data, $new_pivot_data)
+    {
+        if(is_null($table_name)) {
+            $table_name = $this->getTable();
+        }
+
+        if (!$this->readyForAuditing()) {
+            throw new RuntimeException('A valid audit event has not been set');
+        }
+
+        $method = 'audit'.Str::studly($this->auditEvent).'Attributes';
+
+        if (!method_exists($this, $method)) {
+            throw new RuntimeException(sprintf(
+                'Unable to handle "%s" event, %s() method missing',
+                $this->auditEvent,
+                $method
+            ));
+        }
+
+        $this->updateAuditExclusions();
+
+        $old = [];
+        $new = [];
+
+        $this->{$method}($old, $new, $table_name, $old_pivot_data, $new_pivot_data);
+
+        $foreignKey = Config::get('audit.user.foreign_key', 'user_id');
+
+        return $this->transformAudit([
+            'old_values'     => $old,
+            'new_values'     => $new,
+            'event'          => $this->auditEvent,
+            'auditable_id'   => $this->getKey(),
+            'auditable_type' => $this->getMorphClass(),
+            'table'          => $table_name,
             $foreignKey      => $this->resolveUserId(),
             'url'            => $this->resolveUrl(),
             'ip_address'     => $this->resolveIpAddress(),
@@ -342,6 +473,9 @@ trait Auditable
             'updated',
             'deleted',
             'restored',
+            'pivot_attached',
+            'pivot_updated',
+            'pivot_detached',
         ];
     }
 
@@ -406,4 +540,80 @@ trait Auditable
     {
         return isset($this->auditThreshold) ? $this->auditThreshold : 0;
     }
+
+    /**
+     * Define a many-to-many relationship that is auditable.
+     *
+     * @param  string  $related
+     * @param  string  $table
+     * @param  string  $foreignPivotKey
+     * @param  string  $relatedPivotKey
+     * @param  string  $parentKey
+     * @param  string  $relatedKey
+     * @param  string  $relation
+     * @return \Illuminate\Database\Eloquent\Relations\BelongsToMany
+     */
+    public function auditableBelongsToMany($related, $table = null, $foreignPivotKey = null, $relatedPivotKey = null,
+                                  $parentKey = null, $relatedKey = null, $relation = null)
+    {
+        // If no relationship name was passed, we will pull backtraces to get the
+        // name of the calling function. We will use that function name as the
+        // title of this relation since that is a great convention to apply.
+        if (is_null($relation)) {
+            $relation = $this->guessBelongsToManyRelation();
+        }
+        // First, we'll need to determine the foreign key and "other key" for the
+        // relationship. Once we have determined the keys we'll make the query
+        // instances as well as the relationship instances we need for this.
+        $instance = $this->newRelatedInstance($related);
+        $foreignPivotKey = $foreignPivotKey ?: $this->getForeignKey();
+        $relatedPivotKey = $relatedPivotKey ?: $instance->getForeignKey();
+        // If no table name was provided, we can guess it by concatenating the two
+        // models using underscores in alphabetical order. The two model names
+        // are transformed to snake case from their default CamelCase also.
+        if (is_null($table)) {
+            $table = $this->joiningTable($related);
+        }
+        return new AuditableBelongsToMany(
+            $instance->newQuery(), $this, $table, $foreignPivotKey,
+            $relatedPivotKey, $parentKey ?: $this->getKeyName(),
+            $relatedKey ?: $instance->getKeyName(), $relation
+        );
+    }
+
+    /**
+     * Allow firing model events for pivots
+     *
+     * @param [type] $event
+     * @return void
+     */
+    public function fireAuditableModelEvent($event, $table_name, $old_pivot_data, $new_pivot_data, $halt = true) {
+
+        //same logic as Model::fireModelEvent
+
+        if (! isset(static::$dispatcher)) {
+            return true;
+        }
+        // First, we will get the proper method to call on the event dispatcher, and then we
+        // will attempt to fire a custom, object based event for the given event. If that
+        // returns a result we can return that result, or we'll call the string events.
+        $method = $halt ? 'until' : 'fire';
+        $result = $this->filterModelEventResults(
+            $this->fireCustomModelEvent($event, $method)
+        );
+        if ($result === false) {
+            return false;
+        }
+
+        $payload = new \StdClass;
+        $payload->model = $this;
+        $payload->table_name = $table_name;
+        $payload->old_pivot_data = $old_pivot_data;
+        $payload->new_pivot_data = $new_pivot_data;
+        
+        return ! empty($result) ? $result : static::$dispatcher->{$method}(
+            "eloquent.{$event}: ".static::class, $payload
+        );
+    }
+
 }

@@ -23,7 +23,16 @@ interface AuditDriver
      *
      * @return \OwenIt\Auditing\Contracts\Audit
      */
-    public function audit(Auditable $model);
+    public function audit(Auditable $model, $table_name);
+
+    /**
+     * Perform an audit on a model pivot
+     *
+     * @param \OwenIt\Auditing\Contracts\Auditable $model
+     *
+     * @return \OwenIt\Auditing\Contracts\Audit
+     */
+    public function auditPivot(Auditable $model, $table_name, $old_pivot_data, $new_pivot_data);
 
     /**
      * Remove older audits that go over the threshold.

@@ -1,5 +1,5 @@
 {
-    "name": "owen-it/laravel-auditing",
+    "name": "orphans/laravel-auditing",
     "description": "Audit changes of your Eloquent models in Laravel/Lumen",
     "keywords": [
         "accountability",
@@ -36,6 +36,10 @@
         {
             "name": "Raphael França",
             "email": "raphaelfrancabsb@gmail.com"
+        },
+        {
+            "name": "Orphans",
+            "email": "ben@orphans.co.uk"
         }
     ],
     "require": {

@@ -32,6 +32,7 @@ class CreateAuditsTable extends Migration
                 $table->unsignedInteger(Config::get('audit.user.foreign_key', 'user_id'))->nullable();
                 $table->string('event');
                 $table->morphs('auditable');
+                $table->string('table_name');
                 $table->text('old_values')->nullable();
                 $table->text('new_values')->nullable();
                 $table->text('url')->nullable();

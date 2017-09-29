@@ -84,6 +84,7 @@ trait Audit
         $this->data = [
             'audit_id'         => $this->id,
             'audit_event'      => $this->event,
+            'audit_table_name' => $this->table_name,
             'audit_url'        => $this->url,
             'audit_ip_address' => $this->ip_address,
             'audit_user_agent' => $this->user_agent,

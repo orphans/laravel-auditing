@@ -23,11 +23,19 @@ class Database implements AuditDriver
     /**
      * {@inheritdoc}
      */
-    public function audit(Auditable $model)
+    public function audit(Auditable $model, $table_name)
     {
         $class = Config::get('audit.implementation', \OwenIt\Auditing\Models\Audit::class);
+        return $class::create($model->toAudit($table_name));
+    }
 
-        return $class::create($model->toAudit());
+    /**
+     * {@inheritdoc}
+     */
+    public function auditPivot(Auditable $model, $table_name, $old_pivot_data, $new_pivot_data)
+    {
+        $class = Config::get('audit.implementation', \OwenIt\Auditing\Models\Audit::class);
+        return $class::create($model->toAuditPivot($table_name, $old_pivot_data, $new_pivot_data));
     }
 
     /**

@@ -95,4 +95,19 @@ class AuditableObserver
         // as before, in case a legitimate update event is fired
         static::$restoring = false;
     }
+
+    /**
+     * Additional events to handle many to many relations
+     */
+    public function pivot_attached($payload) {
+        Auditor::execute($payload->model->setAuditEvent('pivot_attached'), $payload->table_name, $payload->old_pivot_data, $payload->new_pivot_data);
+    }
+
+    public function pivot_updated($payload) {
+        Auditor::execute($payload->model->setAuditEvent('pivot_updated'), $payload->table_name, $payload->old_pivot_data, $payload->new_pivot_data);
+    }
+
+    public function pivot_detached($payload) {
+        Auditor::execute($payload->model->setAuditEvent('pivot_detached'), $payload->table_name, $payload->old_pivot_data, $payload->new_pivot_data);
+    }
 }

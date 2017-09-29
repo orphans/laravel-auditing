@@ -67,7 +67,7 @@ class Auditor extends Manager implements AuditorContract
     /**
      * {@inheritdoc}
      */
-    public function execute(AuditableContract $model)
+    public function execute(AuditableContract $model, $table_name = null, $old_pivot_data = null, $new_pivot_data = null)
     {
         if (!$model->readyForAuditing()) {
             return;
@@ -79,8 +79,18 @@ class Auditor extends Manager implements AuditorContract
             return;
         }
 
-        if ($audit = $driver->audit($model)) {
-            $driver->prune($model);
+        if(is_null($table_name)) {
+            $table_name = $model->getTable();
+        }
+
+        if(!is_null($old_pivot_data) || !is_null($new_pivot_data)) {
+            if ($audit = $driver->auditPivot($model, $table_name, $old_pivot_data, $new_pivot_data)) {
+                $driver->prune($model);
+            }
+        } else {
+            if ($audit = $driver->audit($model,$table_name)) {
+                $driver->prune($model);
+            }
         }
 
         $this->app->make('events')->fire(

@@ -1,3 +1,11 @@
+## dev-master (2018-09-29)
+### Added
+- Many-to-many auditing functionality, a 'auditableBelongsToMany' is a effective replacement for 'belongsToMany'.
+
+### Changed
+- updated migration to include table name field.
+- Auditable::_contruct method must be called in classes where it is used (only need for many to many functionality).
+
 ## v4.1.3 (2017-09-17)
 ### Added
 - CONTRIBUTING document

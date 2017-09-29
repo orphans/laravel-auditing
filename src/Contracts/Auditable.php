@@ -46,7 +46,16 @@ interface Auditable
      *
      * @return array
      */
-    public function toAudit();
+    public function toAudit($table_name = null);
+
+    /**
+     * Return data for an Audit of a pivot
+     *
+     * @throws \RuntimeException
+     *
+     * @return array
+     */
+    public function toAuditPivot($table_name = null, $old_pivot_data, $new_pivot_data);
 
     /**
      * Get the (Auditable) attributes included in audit.
@@ -98,4 +107,27 @@ interface Auditable
      * @return array
      */
     public function transformAudit(array $data);
+
+    /**
+     * Define a many-to-many relationship that is auditable.
+     *
+     * @param  string  $related
+     * @param  string  $table
+     * @param  string  $foreignPivotKey
+     * @param  string  $relatedPivotKey
+     * @param  string  $parentKey
+     * @param  string  $relatedKey
+     * @param  string  $relation
+     * @return \Illuminate\Database\Eloquent\Relations\BelongsToMany
+     */
+    public function auditableBelongsToMany($related, $table = null, $foreignPivotKey = null, $relatedPivotKey = null,
+                                  $parentKey = null, $relatedKey = null, $relation = null);
+
+    /**
+     * Allow firing model events for pivots
+     *
+     * @param [type] $event
+     * @return void
+     */
+    public function fireAuditableModelEvent($event, $table_name, $old_pivot_data, $new_pivot_data, $halt = true);
 }
