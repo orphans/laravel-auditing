@@ -69,21 +69,29 @@ class Auditor extends Manager implements AuditorContract
      */
     public function execute(AuditableContract $model, $table_name = null, $old_pivot_data = null, $new_pivot_data = null)
     {
+        $is_pivot = !is_null($old_pivot_data) || !is_null($new_pivot_data);
+
         if (!$model->readyForAuditing()) {
             return;
         }
 
         $driver = $this->auditDriver($model);
 
-        if (!$this->fireAuditingEvent($model, $driver)) {
-            return;
+        if($is_pivot) {
+            if (!$this->fireAuditingPivotEvent($model, $driver, $table_name)) {
+                return;
+            }
+        } else {
+            if (!$this->fireAuditingEvent($model, $driver)) {
+                return;
+            }
         }
 
         if(is_null($table_name)) {
             $table_name = $model->getTable();
         }
 
-        if(!is_null($old_pivot_data) || !is_null($new_pivot_data)) {
+        if($is_pivot) {
             if ($audit = $driver->auditPivot($model, $table_name, $old_pivot_data, $new_pivot_data)) {
                 $driver->prune($model);
             }
@@ -93,9 +101,15 @@ class Auditor extends Manager implements AuditorContract
             }
         }
 
-        $this->app->make('events')->fire(
-            new Audited($model, $driver, $audit)
-        );
+        if($is_pivot) {
+            $this->app->make('events')->fire(
+                new AuditedPivot($model, $driver, $audit, $table_name)
+            );
+        } else {
+            $this->app->make('events')->fire(
+                new Audited($model, $driver, $audit)
+            );
+        }
     }
 
     /**
@@ -120,6 +134,21 @@ class Auditor extends Manager implements AuditorContract
     {
         return $this->app->make('events')->until(
             new Auditing($model, $driver)
+        ) !== false;
+    }
+
+    /**
+     * Fire the Auditing pivot event.
+     *
+     * @param \OwenIt\Auditing\Contracts\Auditable   $model
+     * @param \OwenIt\Auditing\Contracts\AuditDriver $driver
+     *
+     * @return bool
+     */
+    protected function fireAuditingPivotEvent(AuditableContract $model, AuditDriver $driver, $table_name)
+    {
+        return $this->app->make('events')->until(
+            new AuditingPivot($model, $driver, $table_name)
         ) !== false;
     }
 }
