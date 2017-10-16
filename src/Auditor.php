@@ -22,6 +22,8 @@ use OwenIt\Auditing\Contracts\Auditor as AuditorContract;
 use OwenIt\Auditing\Drivers\Database;
 use OwenIt\Auditing\Events\Audited;
 use OwenIt\Auditing\Events\Auditing;
+use OwenIt\Auditing\Events\AuditedPivot;
+use OwenIt\Auditing\Events\AuditingPivot;
 use RuntimeException;
 
 class Auditor extends Manager implements AuditorContract
