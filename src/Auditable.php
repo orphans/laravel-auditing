@@ -226,7 +226,7 @@ trait Auditable
         });
 
         foreach($dirty_keys as $attribute) {
-            if($this->isAuditingAuditable($table_name . '.' . $attribute)) {
+            if($this->isAttributeAuditable($table_name . '.' . $attribute)) {
                 $old[$attribute] = array_get($old_pivot_data, $attribute);
                 $new[$attribute] = array_get($new_pivot_data, $attribute);
             }
